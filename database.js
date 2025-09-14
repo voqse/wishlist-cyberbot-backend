@@ -20,6 +20,7 @@ async function setupDatabase() {
 
     CREATE TABLE IF NOT EXISTS wishlists (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      shareId TEXT NOT NULL UNIQUE,
       title TEXT NOT NULL,
       createdBy INTEGER NOT NULL UNIQUE,
       createdAt TEXT NOT NULL,

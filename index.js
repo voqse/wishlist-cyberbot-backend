@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import jwt from '@fastify/jwt';
 import setupDatabase from './database.js';
 import authRoutes from './routes/auth.js';
+import wishlistRoutes from './routes/wishlist.js';
 
 dotenv.config();
 
@@ -32,6 +33,7 @@ const start = async () => {
   try {
     db = await setupDatabase();
     app.register(authRoutes, { prefix: '/auth', db });
+    app.register(wishlistRoutes, { prefix: '/wishlist', db });
     await app.listen({ port: 3000 });
   } catch (err) {
     app.log.error(err);
