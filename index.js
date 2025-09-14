@@ -1,12 +1,9 @@
 import jwt from '@fastify/jwt'
 import websocket from '@fastify/websocket'
-import dotenv from 'dotenv'
 import fastify from 'fastify'
 import setupDatabase from './database.js'
 import authRoutes from './routes/auth.js'
 import wishlistRoutes from './routes/wishlist.js'
-
-dotenv.config({ path: ['.env.local', '.env'] })
 
 const app = fastify({ logger: true })
 let db

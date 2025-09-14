@@ -38,7 +38,16 @@ export default async function authRoutes(app, options) {
       )
 
       const token = app.jwt.sign({ id: user.id })
-      reply.send({ token })
+      reply.send({
+        id: user.id,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        username: user.username,
+        languageCode: user.language_code,
+        isPremium: user.is_premium,
+        photoUrl: user.photo_url,
+        token,
+      })
     }
     catch (error) {
       app.log.error(error)
