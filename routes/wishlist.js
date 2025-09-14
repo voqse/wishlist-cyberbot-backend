@@ -1,7 +1,38 @@
 import crypto from 'crypto';
 
+const connections = new Map();
+
+function broadcast(shareId, message, app) {
+  const clients = connections.get(shareId);
+  if (clients) {
+    app.log.info(`Broadcasting to ${clients.size} clients for wishlist ${shareId}`);
+    for (const client of clients) {
+      client.send(JSON.stringify(message));
+    }
+  }
+}
+
 export default async function wishlistRoutes(app, options) {
   const { db } = options;
+
+  app.get('/ws/:shareId', { websocket: true }, (connection, request) => {
+    const { shareId } = request.params;
+
+    if (!connections.has(shareId)) {
+      connections.set(shareId, new Set());
+    }
+    const clients = connections.get(shareId);
+    clients.add(connection.socket);
+    app.log.info(`New client connected for wishlist ${shareId}. Total clients: ${clients.size}`);
+
+    connection.socket.on('close', () => {
+      clients.delete(connection.socket);
+      app.log.info(`Client disconnected from wishlist ${shareId}. Total clients: ${clients.size}`);
+      if (clients.size === 0) {
+        connections.delete(shareId);
+      }
+    });
+  });
 
   app.get('/', async (request, reply) => {
     try {
@@ -204,6 +235,9 @@ export default async function wishlistRoutes(app, options) {
 
       await db.exec('COMMIT');
 
+      const { shareId } = await db.get('SELECT shareId FROM wishlists WHERE id = ?', wishlist.id);
+      broadcast(shareId, { type: 'items_updated' }, app);
+
       reply.send({ success: true });
 
     } catch (error) {
@@ -242,6 +276,9 @@ export default async function wishlistRoutes(app, options) {
         new Date().toISOString(),
         itemId
       );
+
+      const { shareId } = await db.get('SELECT w.shareId FROM wishlists w JOIN items i ON w.id = i.wishlistId WHERE i.id = ?', itemId);
+      broadcast(shareId, { type: 'item_reserved', itemId: parseInt(itemId, 10) }, app);
 
       reply.send({ success: true });
 

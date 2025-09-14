@@ -1,6 +1,7 @@
 import fastify from 'fastify';
 import dotenv from 'dotenv';
 import jwt from '@fastify/jwt';
+import websocket from '@fastify/websocket';
 import setupDatabase from './database.js';
 import authRoutes from './routes/auth.js';
 import wishlistRoutes from './routes/wishlist.js';
@@ -14,8 +15,10 @@ app.register(jwt, {
   secret: process.env.JWT_SECRET,
 });
 
+app.register(websocket);
+
 app.addHook('onRequest', async (request, reply) => {
-  if (request.routerPath.startsWith('/auth')) {
+  if (request.routerPath.startsWith('/auth') || request.routerPath.startsWith('/wishlist/ws')) {
     return;
   }
   try {
