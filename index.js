@@ -6,7 +6,7 @@ import setupDatabase from './database.js';
 import authRoutes from './routes/auth.js';
 import wishlistRoutes from './routes/wishlist.js';
 
-dotenv.config();
+dotenv.config({ path: ['.env.local', '.env'] });
 
 const app = fastify({ logger: true });
 let db;
@@ -18,7 +18,8 @@ app.register(jwt, {
 app.register(websocket);
 
 app.addHook('onRequest', async (request, reply) => {
-  if (request.routerPath.startsWith('/auth') || request.routerPath.startsWith('/wishlist/ws')) {
+  const url = request.raw.url;
+  if (url.startsWith('/auth') || url.startsWith('/wishlist/ws')) {
     return;
   }
   try {

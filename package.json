@@ -3,7 +3,8 @@
   "packageManager": "yarn@4.9.4",
   "type": "module",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "generate-init-data": "node scripts/generate-init-data.js"
   },
   "dependencies": {
     "@fastify/jwt": "^10.0.0",

@@ -10,17 +10,18 @@ function validateTelegramAuth(initData, botToken) {
     if (!hash) {
         return { isValid: false, user: null };
     }
-    params.delete('hash');
 
     const dataCheckArr = [];
-    // The data is sorted alphabetically by key
-    const sortedParams = new URLSearchParams(Array.from(params.entries()).sort());
+    initData.split('&').forEach(pair => {
+        if (pair.startsWith('hash=')) {
+            return;
+        }
+        dataCheckArr.push(pair);
+    });
 
-    for (const [key, value] of sortedParams.entries()) {
-        dataCheckArr.push(`${key}=${value}`);
-    }
+    dataCheckArr.sort();
 
-    const dataCheckString = dataCheckArr.join('\\n');
+    const dataCheckString = dataCheckArr.join('\n');
 
     const secretKey = crypto.createHmac('sha256', 'WebAppData').update(botToken).digest();
     const hmac = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
@@ -29,10 +30,9 @@ function validateTelegramAuth(initData, botToken) {
         return { isValid: false, user: null };
     }
 
-    const user = JSON.parse(params.get('user'));
+    const user = JSON.parse(decodeURIComponent(params.get('user')));
 
     return { isValid: true, user };
 }
 
 export { validateTelegramAuth };
-
