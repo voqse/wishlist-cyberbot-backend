@@ -1,48 +1,36 @@
-import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import dotenv from 'dotenv';
-
-dotenv.config({ path: ['.env.local', '.env'] });
+import { createDataCheckString, signData, botToken } from '../auth-utils.js';
 
 const mockUser = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'scripts', 'mock-user.json'), 'utf-8'));
 
-function generateInitData(userData, botToken) {
+function generateInitData(userData) {
     const authDate = Math.floor(Date.now() / 1000);
-    const queryId = crypto.randomBytes(12).toString('hex');
+    const queryId = 'mock_query_id'; // Using a static query_id for consistency
     const userJson = JSON.stringify(userData);
 
-    const data = {
-      query_id: queryId,
-      user: userJson,
-      auth_date: authDate,
+    const dataForHash = {
+        query_id: queryId,
+        user: userJson,
+        auth_date: authDate,
     };
 
-    const dataCheckArr = [];
-    for (const key in data) {
-        dataCheckArr.push(`${key}=${data[key]}`);
-    }
-    dataCheckArr.sort();
-
-    const dataCheckString = dataCheckArr.join('\n');
-
-    const secretKey = crypto.createHmac('sha256', 'WebAppData').update(botToken).digest();
-    const hash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+    const dataCheckString = createDataCheckString(dataForHash);
+    const hash = signData(dataCheckString, botToken);
 
     const finalParams = new URLSearchParams({
-        ...data,
-        hash,
+        ...dataForHash,
+        hash: hash,
     });
 
     return finalParams.toString();
 }
 
-const botToken = process.env.TELEGRAM_BOT_TOKEN;
 if (!botToken) {
     console.error('Error: TELEGRAM_BOT_TOKEN is not defined in your .env file.');
     process.exit(1);
 }
 
-const initData = generateInitData(mockUser, botToken);
+const initData = generateInitData(mockUser);
 console.log('Generated initData string:');
 console.log(initData);

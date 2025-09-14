@@ -5,7 +5,7 @@ export default async function authRoutes(app, options) {
 
   app.post('/telegram', async (request, reply) => {
     try {
-      const { initData } = request.body;
+      const { initData } = request.body ?? {};
 
       if (!initData) {
         return reply.code(400).send({ error: 'initData is required' });

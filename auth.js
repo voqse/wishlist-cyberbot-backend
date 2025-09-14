@@ -1,6 +1,6 @@
-import crypto from 'crypto';
+import { createDataCheckString, signData, botToken } from './auth-utils.js';
 
-function validateTelegramAuth(initData, botToken) {
+function validateTelegramAuth(initData) {
     if (!initData) {
         return { isValid: false, user: null };
     }
@@ -11,26 +11,21 @@ function validateTelegramAuth(initData, botToken) {
         return { isValid: false, user: null };
     }
 
-    const dataCheckArr = [];
-    initData.split('&').forEach(pair => {
-        if (pair.startsWith('hash=')) {
-            return;
+    const dataForCheck = {};
+    for (const [key, value] of params.entries()) {
+        if (key !== 'hash') {
+            dataForCheck[key] = value;
         }
-        dataCheckArr.push(pair);
-    });
+    }
 
-    dataCheckArr.sort();
-
-    const dataCheckString = dataCheckArr.join('\n');
-
-    const secretKey = crypto.createHmac('sha256', 'WebAppData').update(botToken).digest();
-    const hmac = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+    const dataCheckString = createDataCheckString(dataForCheck);
+    const hmac = signData(dataCheckString, botToken);
 
     if (hmac !== hash) {
         return { isValid: false, user: null };
     }
 
-    const user = JSON.parse(decodeURIComponent(params.get('user')));
+    const user = JSON.parse(dataForCheck.user);
 
     return { isValid: true, user };
 }
