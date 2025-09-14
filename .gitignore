@@ -37,3 +37,7 @@ coverage
 *.sw?
 
 *.tsbuildinfo
+
+# Database
+*.db
+*.db-journal
