@@ -155,4 +155,99 @@ export default async function wishlistRoutes(app, options) {
       reply.code(500).send({ error: 'Internal Server Error' });
     }
   });
+
+  app.post('/items', async (request, reply) => {
+    try {
+      const authenticatedUserId = request.user.id;
+      const { items: incomingItems } = request.body;
+
+      if (!Array.isArray(incomingItems)) {
+        return reply.code(400).send({ error: 'Items must be an array.' });
+      }
+
+      const wishlist = await db.get('SELECT id FROM wishlists WHERE createdBy = ?', authenticatedUserId);
+      if (!wishlist) {
+        return reply.code(403).send({ error: 'You can only edit your own wishlist.' });
+      }
+
+      const existingItems = await db.all('SELECT id FROM items WHERE wishlistId = ?', wishlist.id);
+      const existingItemIds = new Set(existingItems.map(i => i.id));
+      const incomingItemIds = new Set(incomingItems.filter(i => i.id).map(i => i.id));
+
+      await db.exec('BEGIN');
+
+      // Add or update items
+      for (const item of incomingItems) {
+        const links = JSON.stringify(item.links || []);
+        const photos = JSON.stringify(item.photos || []);
+
+        if (item.id) { // Update existing item
+          if (!existingItemIds.has(item.id)) continue; // Don't update items that don't belong to the user
+          await db.run(
+            'UPDATE items SET text = ?, links = ?, photos = ? WHERE id = ? AND wishlistId = ?',
+            item.text, links, photos, item.id, wishlist.id
+          );
+        } else { // Add new item
+          await db.run(
+            'INSERT INTO items (text, links, photos, createdBy, createdAt, wishlistId) VALUES (?, ?, ?, ?, ?, ?)',
+            item.text, links, photos, authenticatedUserId, new Date().toISOString(), wishlist.id
+          );
+        }
+      }
+
+      // Delete items that are no longer in the list
+      for (const id of existingItemIds) {
+        if (!incomingItemIds.has(id)) {
+          await db.run('DELETE FROM items WHERE id = ?', id);
+        }
+      }
+
+      await db.exec('COMMIT');
+
+      reply.send({ success: true });
+
+    } catch (error) {
+      await db.exec('ROLLBACK');
+      app.log.error(error);
+      reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
+  app.post('/items/:itemId/reserve', async (request, reply) => {
+    try {
+      const { itemId } = request.params;
+      const authenticatedUserId = request.user.id;
+
+      const item = await db.get('SELECT * FROM items WHERE id = ?', itemId);
+      if (!item) {
+        return reply.code(404).send({ error: 'Item not found.' });
+      }
+
+      const wishlist = await db.get('SELECT createdBy FROM wishlists WHERE id = ?', item.wishlistId);
+      if (wishlist.createdBy === authenticatedUserId) {
+        return reply.code(403).send({ error: 'You cannot reserve items from your own wishlist.' });
+      }
+
+      if (item.reservedBy) {
+        if (item.reservedBy === authenticatedUserId) {
+          return reply.send({ success: true, message: 'You have already reserved this item.' });
+        } else {
+          return reply.code(409).send({ error: 'This item is already reserved by someone else.' });
+        }
+      }
+
+      await db.run(
+        'UPDATE items SET reservedBy = ?, reservedAt = ? WHERE id = ?',
+        authenticatedUserId,
+        new Date().toISOString(),
+        itemId
+      );
+
+      reply.send({ success: true });
+
+    } catch (error) {
+      app.log.error(error);
+      reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
 }
