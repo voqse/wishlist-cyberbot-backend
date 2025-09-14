@@ -122,4 +122,3 @@ Establishes a WebSocket connection to receive live updates for a specific wishli
         { "type": "item_reserved", "itemId": 123 }
         ```
 -   **Client Action**: Upon receiving a message, the client should re-fetch the wishlist data using `GET /wishlist/:shareId` to get the latest state.
-

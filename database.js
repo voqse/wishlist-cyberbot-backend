@@ -1,11 +1,11 @@
-import sqlite3 from 'sqlite3';
-import { open } from 'sqlite';
+import { open } from 'sqlite'
+import sqlite3 from 'sqlite3'
 
 async function setupDatabase() {
   const db = await open({
     filename: './wishlist.db',
-    driver: sqlite3.Database
-  });
+    driver: sqlite3.Database,
+  })
 
   await db.exec(`
     CREATE TABLE IF NOT EXISTS users (
@@ -41,10 +41,10 @@ async function setupDatabase() {
       FOREIGN KEY (reservedBy) REFERENCES users(id),
       FOREIGN KEY (wishlistId) REFERENCES wishlists(id)
     );
-  `);
+  `)
 
-  console.log('Database setup complete.');
-  return db;
+  console.log('Database setup complete.')
+  return db
 }
 
-export default setupDatabase;
+export default setupDatabase

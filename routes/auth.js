@@ -1,20 +1,20 @@
-import { validateTelegramAuth } from '../auth.js';
+import { validateTelegramAuth } from '../auth.js'
 
 export default async function authRoutes(app, options) {
-  const { db } = options;
+  const { db } = options
 
   app.post('/telegram', async (request, reply) => {
     try {
-      const { initData } = request.body ?? {};
+      const { initData } = request.body ?? {}
 
       if (!initData) {
-        return reply.code(400).send({ error: 'initData is required' });
+        return reply.code(400).send({ error: 'initData is required' })
       }
 
-      const { isValid, user } = validateTelegramAuth(initData, process.env.TELEGRAM_BOT_TOKEN);
+      const { isValid, user } = validateTelegramAuth(initData, process.env.TELEGRAM_BOT_TOKEN)
 
       if (!isValid) {
-        return reply.code(401).send({ error: 'Invalid Telegram data' });
+        return reply.code(401).send({ error: 'Invalid Telegram data' })
       }
 
       // Upsert user into the database
@@ -34,16 +34,15 @@ export default async function authRoutes(app, options) {
         user.username,
         user.language_code,
         user.is_premium ? 1 : 0,
-        user.photo_url
-      );
+        user.photo_url,
+      )
 
-      const token = app.jwt.sign({ id: user.id });
-      reply.send({ token });
-
-    } catch (error) {
-      app.log.error(error);
-      return reply.code(500).send({ error: 'Internal Server Error' });
+      const token = app.jwt.sign({ id: user.id })
+      reply.send({ token })
     }
-  });
+    catch (error) {
+      app.log.error(error)
+      return reply.code(500).send({ error: 'Internal Server Error' })
+    }
+  })
 }
-

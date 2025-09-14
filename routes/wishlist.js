@@ -1,42 +1,42 @@
-import crypto from 'crypto';
+import crypto from 'node:crypto'
 
-const connections = new Map();
+const connections = new Map()
 
 function broadcast(shareId, message, app) {
-  const clients = connections.get(shareId);
+  const clients = connections.get(shareId)
   if (clients) {
-    app.log.info(`Broadcasting to ${clients.size} clients for wishlist ${shareId}`);
+    app.log.info(`Broadcasting to ${clients.size} clients for wishlist ${shareId}`)
     for (const client of clients) {
-      client.send(JSON.stringify(message));
+      client.send(JSON.stringify(message))
     }
   }
 }
 
 export default async function wishlistRoutes(app, options) {
-  const { db } = options;
+  const { db } = options
 
   app.get('/ws/:shareId', { websocket: true }, (connection, request) => {
-    const { shareId } = request.params;
+    const { shareId } = request.params
 
     if (!connections.has(shareId)) {
-      connections.set(shareId, new Set());
+      connections.set(shareId, new Set())
     }
-    const clients = connections.get(shareId);
-    clients.add(connection.socket);
-    app.log.info(`New client connected for wishlist ${shareId}. Total clients: ${clients.size}`);
+    const clients = connections.get(shareId)
+    clients.add(connection.socket)
+    app.log.info(`New client connected for wishlist ${shareId}. Total clients: ${clients.size}`)
 
     connection.socket.on('close', () => {
-      clients.delete(connection.socket);
-      app.log.info(`Client disconnected from wishlist ${shareId}. Total clients: ${clients.size}`);
+      clients.delete(connection.socket)
+      app.log.info(`Client disconnected from wishlist ${shareId}. Total clients: ${clients.size}`)
       if (clients.size === 0) {
-        connections.delete(shareId);
+        connections.delete(shareId)
       }
-    });
-  });
+    })
+  })
 
   app.get('/', async (request, reply) => {
     try {
-      const authenticatedUserId = request.user.id;
+      const authenticatedUserId = request.user.id
 
       // Get wishlist and creator for the authenticated user
       let wishlist = await db.get(
@@ -55,34 +55,34 @@ export default async function wishlistRoutes(app, options) {
          FROM wishlists w
          JOIN users u ON w.createdBy = u.id
          WHERE w.createdBy = ?`,
-        authenticatedUserId
-      );
+        authenticatedUserId,
+      )
 
       if (!wishlist) {
         // User exists but has no wishlist, create one
-        const shareId = crypto.randomBytes(8).toString('hex');
+        const shareId = crypto.randomBytes(8).toString('hex')
         const result = await db.run(
           'INSERT INTO wishlists (title, createdBy, createdAt, shareId) VALUES (?, ?, ?, ?)',
           'My Wishlist',
           authenticatedUserId,
           new Date().toISOString(),
-          shareId
-        );
+          shareId,
+        )
 
-        wishlist = await db.get('SELECT *, ? as shareId FROM wishlists WHERE id = ?', shareId, result.lastID);
-        wishlist.items = [];
-        const user = await db.get('SELECT * FROM users WHERE id = ?', authenticatedUserId);
+        wishlist = await db.get('SELECT *, ? as shareId FROM wishlists WHERE id = ?', shareId, result.lastID)
+        wishlist.items = []
+        const user = await db.get('SELECT * FROM users WHERE id = ?', authenticatedUserId)
         wishlist.createdBy = {
-            id: user.id,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            username: user.username,
-            photoUrl: user.photoUrl
-        };
-        return reply.send(wishlist);
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          username: user.username,
+          photoUrl: user.photoUrl,
+        }
+        return reply.send(wishlist)
       }
 
-      wishlist.createdBy = JSON.parse(wishlist.createdBy);
+      wishlist.createdBy = JSON.parse(wishlist.createdBy)
 
       // The rest of the logic remains the same as the shared route
       const items = await db.all(
@@ -92,32 +92,32 @@ export default async function wishlistRoutes(app, options) {
          FROM items i
          LEFT JOIN users u ON i.reservedBy = u.id
          WHERE i.wishlistId = ?`,
-        wishlist.id
-      );
+        wishlist.id,
+      )
 
-      wishlist.items = items.map(item => {
-        const { reservedBy, ...rest } = item;
+      wishlist.items = items.map((item) => {
+        const { reservedBy, ...rest } = item
         const result = {
           ...rest,
           links: item.links ? JSON.parse(item.links) : [],
           photos: item.photos ? JSON.parse(item.photos) : [],
-          isReserved: !!reservedBy
-        };
-        return result;
-      });
+          isReserved: !!reservedBy,
+        }
+        return result
+      })
 
-      reply.send(wishlist);
-
-    } catch (error) {
-      app.log.error(error);
-      reply.code(500).send({ error: 'Internal Server Error' });
+      reply.send(wishlist)
     }
-  });
+    catch (error) {
+      app.log.error(error)
+      reply.code(500).send({ error: 'Internal Server Error' })
+    }
+  })
 
   app.get('/:shareId', async (request, reply) => {
     try {
-      const { shareId } = request.params;
-      const authenticatedUserId = request.user.id;
+      const { shareId } = request.params
+      const authenticatedUserId = request.user.id
 
       // Get wishlist and creator by shareId
       const wishlist = await db.get(
@@ -136,14 +136,14 @@ export default async function wishlistRoutes(app, options) {
          FROM wishlists w
          JOIN users u ON w.createdBy = u.id
          WHERE w.shareId = ?`,
-        shareId
-      );
+        shareId,
+      )
 
       if (!wishlist) {
-        return reply.code(404).send({ error: 'Wishlist not found' });
+        return reply.code(404).send({ error: 'Wishlist not found' })
       }
 
-      wishlist.createdBy = JSON.parse(wishlist.createdBy);
+      wishlist.createdBy = JSON.parse(wishlist.createdBy)
 
       // Get items for the wishlist
       const items = await db.all(
@@ -153,120 +153,132 @@ export default async function wishlistRoutes(app, options) {
          FROM items i
          LEFT JOIN users u ON i.reservedBy = u.id
          WHERE i.wishlistId = ?`,
-        wishlist.id
-      );
+        wishlist.id,
+      )
 
-      const isOwner = authenticatedUserId == wishlist.createdBy.id;
+      const isOwner = authenticatedUserId === wishlist.createdBy.id
 
-      wishlist.items = items.map(item => {
-        const { reservedBy, ...rest } = item;
+      wishlist.items = items.map((item) => {
+        const { reservedBy, ...rest } = item
         const result = {
           ...rest,
           links: item.links ? JSON.parse(item.links) : [],
           photos: item.photos ? JSON.parse(item.photos) : [],
-        };
-
-        if (reservedBy) {
-          const reservedByUser = JSON.parse(reservedBy);
-          if (!isOwner) {
-            result.reservedBy = reservedByUser;
-          }
-          result.isReserved = true;
-        } else {
-          result.isReserved = false;
         }
 
-        return result;
-      });
+        if (reservedBy) {
+          const reservedByUser = JSON.parse(reservedBy)
+          if (!isOwner) {
+            result.reservedBy = reservedByUser
+          }
+          result.isReserved = true
+        }
+        else {
+          result.isReserved = false
+        }
 
-      reply.send(wishlist);
+        return result
+      })
 
-    } catch (error) {
-      app.log.error(error);
-      reply.code(500).send({ error: 'Internal Server Error' });
+      reply.send(wishlist)
     }
-  });
+    catch (error) {
+      app.log.error(error)
+      reply.code(500).send({ error: 'Internal Server Error' })
+    }
+  })
 
   app.post('/items', async (request, reply) => {
     try {
-      const authenticatedUserId = request.user.id;
-      const { items: incomingItems } = request.body;
+      const authenticatedUserId = request.user.id
+      const { items: incomingItems } = request.body
 
       if (!Array.isArray(incomingItems)) {
-        return reply.code(400).send({ error: 'Items must be an array.' });
+        return reply.code(400).send({ error: 'Items must be an array.' })
       }
 
-      const wishlist = await db.get('SELECT id FROM wishlists WHERE createdBy = ?', authenticatedUserId);
+      const wishlist = await db.get('SELECT id FROM wishlists WHERE createdBy = ?', authenticatedUserId)
       if (!wishlist) {
-        return reply.code(403).send({ error: 'You can only edit your own wishlist.' });
+        return reply.code(403).send({ error: 'You can only edit your own wishlist.' })
       }
 
-      const existingItems = await db.all('SELECT id FROM items WHERE wishlistId = ?', wishlist.id);
-      const existingItemIds = new Set(existingItems.map(i => i.id));
-      const incomingItemIds = new Set(incomingItems.filter(i => i.id).map(i => i.id));
+      const existingItems = await db.all('SELECT id FROM items WHERE wishlistId = ?', wishlist.id)
+      const existingItemIds = new Set(existingItems.map(i => i.id))
+      const incomingItemIds = new Set(incomingItems.filter(i => i.id).map(i => i.id))
 
-      await db.exec('BEGIN');
+      await db.exec('BEGIN')
 
       // Add or update items
       for (const item of incomingItems) {
-        const links = JSON.stringify(item.links || []);
-        const photos = JSON.stringify(item.photos || []);
+        const links = JSON.stringify(item.links || [])
+        const photos = JSON.stringify(item.photos || [])
 
         if (item.id) { // Update existing item
-          if (!existingItemIds.has(item.id)) continue; // Don't update items that don't belong to the user
+          if (!existingItemIds.has(item.id)) continue // Don't update items that don't belong to the user
           await db.run(
             'UPDATE items SET text = ?, links = ?, photos = ? WHERE id = ? AND wishlistId = ?',
-            item.text, links, photos, item.id, wishlist.id
-          );
-        } else { // Add new item
+            item.text,
+            links,
+            photos,
+            item.id,
+            wishlist.id,
+          )
+        }
+        else { // Add new item
           await db.run(
             'INSERT INTO items (text, links, photos, createdBy, createdAt, wishlistId) VALUES (?, ?, ?, ?, ?, ?)',
-            item.text, links, photos, authenticatedUserId, new Date().toISOString(), wishlist.id
-          );
+            item.text,
+            links,
+            photos,
+            authenticatedUserId,
+            new Date().toISOString(),
+            wishlist.id,
+          )
         }
       }
 
       // Delete items that are no longer in the list
       for (const id of existingItemIds) {
         if (!incomingItemIds.has(id)) {
-          await db.run('DELETE FROM items WHERE id = ?', id);
+          await db.run('DELETE FROM items WHERE id = ?', id)
         }
       }
 
-      await db.exec('COMMIT');
+      await db.exec('COMMIT')
 
-      const { shareId } = await db.get('SELECT shareId FROM wishlists WHERE id = ?', wishlist.id);
-      broadcast(shareId, { type: 'items_updated' }, app);
+      const { shareId } = await db.get('SELECT shareId FROM wishlists WHERE id = ?', wishlist.id)
+      broadcast(shareId, { type: 'items_updated' }, app)
 
-      reply.send({ success: true });
-
-    } catch (error) {
-      await db.exec('ROLLBACK');
-      app.log.error(error);
-      reply.code(500).send({ error: 'Internal Server Error' });
+      reply.send({ success: true })
     }
-  });
+    catch (error) {
+      await db.exec('ROLLBACK')
+      app.log.error(error)
+      reply.code(500).send({ error: 'Internal Server Error' })
+    }
+  })
 
   app.post('/items/:itemId/reserve', async (request, reply) => {
     try {
-      const { itemId } = request.params;
-      const authenticatedUserId = request.user.id;
+      const { itemId } = request.params
+      const authenticatedUserId = request.user.id
 
-      const item = await db.get('SELECT * FROM items WHERE id = ?', itemId);
+      const item = await db.get('SELECT * FROM items WHERE id = ?', itemId)
       if (!item) {
-        return reply.code(404).send({ error: 'Item not found.' });
+        return reply.code(404).send({ error: 'Item not found.' })
       }
 
-      const wishlist = await db.get('SELECT createdBy FROM wishlists WHERE id = ?', item.wishlistId);
+      const wishlist = await db.get('SELECT createdBy FROM wishlists WHERE id = ?', item.wishlistId)
       if (wishlist.createdBy === authenticatedUserId) {
-        return reply.code(403).send({ error: 'You cannot reserve items from your own wishlist.' });
+        return reply.code(403).send({ error: 'You cannot reserve items from your own wishlist.' })
       }
 
       if (item.reservedBy) {
         if (item.reservedBy === authenticatedUserId) {
-          return reply.send({ success: true, message: 'You have already reserved this item.' });
-        } else {
-          return reply.code(409).send({ error: 'This item is already reserved by someone else.' });
+          return reply.send({ success: true, message: 'You have already reserved this item.' })
+        }
+        else {
+          return reply.code(409).send({ error: 'This item is already reserved by someone else.' })
         }
       }
 
@@ -274,17 +286,17 @@ export default async function wishlistRoutes(app, options) {
         'UPDATE items SET reservedBy = ?, reservedAt = ? WHERE id = ?',
         authenticatedUserId,
         new Date().toISOString(),
-        itemId
-      );
+        itemId,
+      )
 
-      const { shareId } = await db.get('SELECT w.shareId FROM wishlists w JOIN items i ON w.id = i.wishlistId WHERE i.id = ?', itemId);
-      broadcast(shareId, { type: 'item_reserved', itemId: parseInt(itemId, 10) }, app);
+      const { shareId } = await db.get('SELECT w.shareId FROM wishlists w JOIN items i ON w.id = i.wishlistId WHERE i.id = ?', itemId)
+      broadcast(shareId, { type: 'item_reserved', itemId: Number.parseInt(itemId, 10) }, app)
 
-      reply.send({ success: true });
-
-    } catch (error) {
-      app.log.error(error);
-      reply.code(500).send({ error: 'Internal Server Error' });
+      reply.send({ success: true })
     }
-  });
+    catch (error) {
+      app.log.error(error)
+      reply.code(500).send({ error: 'Internal Server Error' })
+    }
+  })
 }
