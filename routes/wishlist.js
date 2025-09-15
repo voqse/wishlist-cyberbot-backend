@@ -84,9 +84,7 @@ export default async function wishlistRoutes(app, options) {
     clients.add(socket)
     app.log.info(`New client connected for wishlist ${shareId}. Total clients: ${clients.size}`)
 
-    socket.on('ping', () => {
-      socket.pong()
-    })
+    socket.on('message', () => socket.send('pong'))
 
     socket.on('close', () => {
       clients.delete(socket)
