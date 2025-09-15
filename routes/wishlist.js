@@ -66,7 +66,7 @@ async function broadcast(shareId, app, db, authenticatedUserId) {
     app.log.info(`Broadcasting to ${clients.size} clients for wishlist ${shareId}`)
     const wishlist = await getWishlist(db, shareId, authenticatedUserId)
     for (const client of clients) {
-      client.send(JSON.stringify({ type: 'update', wishlist }))
+      client.send(JSON.stringify(wishlist))
     }
   }
 }
@@ -74,18 +74,18 @@ async function broadcast(shareId, app, db, authenticatedUserId) {
 export default async function wishlistRoutes(app, options) {
   const { db } = options
 
-  app.get('/ws/:shareId', { websocket: true }, (connection, request) => {
+  app.get('/ws/:shareId', { websocket: true }, (socket, request) => {
     const { shareId } = request.params
 
     if (!connections.has(shareId)) {
       connections.set(shareId, new Set())
     }
     const clients = connections.get(shareId)
-    clients.add(connection.socket)
+    clients.add(socket)
     app.log.info(`New client connected for wishlist ${shareId}. Total clients: ${clients.size}`)
 
-    connection.socket.on('close', () => {
-      clients.delete(connection.socket)
+    socket.on('close', () => {
+      clients.delete(socket)
       app.log.info(`Client disconnected from wishlist ${shareId}. Total clients: ${clients.size}`)
       if (clients.size === 0) {
         connections.delete(shareId)
