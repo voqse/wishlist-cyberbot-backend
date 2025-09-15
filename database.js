@@ -34,7 +34,8 @@ async function setupDatabase() {
       shareId TEXT NOT NULL UNIQUE,
       title TEXT NOT NULL,
       createdBy INTEGER NOT NULL UNIQUE,
-      createdAt TEXT NOT NULL,
+      createdAt TEXT,
+      updatedAt TEXT,
       FOREIGN KEY (createdBy) REFERENCES users(id)
     );
 
@@ -44,7 +45,8 @@ async function setupDatabase() {
       links TEXT,
       photos TEXT,
       createdBy INTEGER NOT NULL,
-      createdAt TEXT NOT NULL,
+      createdAt TEXT,
+      updatedAt TEXT,
       reservedBy INTEGER,
       reservedAt TEXT,
       wishlistId INTEGER NOT NULL,

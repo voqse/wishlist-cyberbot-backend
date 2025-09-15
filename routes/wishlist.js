@@ -10,6 +10,7 @@ async function getWishlist(db, shareId, authenticatedUserId) {
        w.shareId,
        w.title,
        w.createdAt,
+       w.updatedAt,
        json_object(
          'id', u.id,
          'firstName', u.firstName,
@@ -32,7 +33,7 @@ async function getWishlist(db, shareId, authenticatedUserId) {
   // Get items for the wishlist
   const items = await db.all(
     `SELECT
-       i.id, i.text, i.links, i.photos, i.createdAt, i.createdBy, i.reservedAt,
+       i.id, i.text, i.links, i.photos, i.createdAt, i.updatedAt, i.createdBy, i.reservedAt,
        CASE WHEN i.reservedBy IS NOT NULL THEN json_object('id', u.id, 'firstName', u.firstName, 'lastName', u.lastName, 'username', u.username, 'photoUrl', u.photoUrl) ELSE NULL END as reservedBy
      FROM items i
      LEFT JOIN users u ON i.reservedBy = u.id
@@ -107,6 +108,7 @@ export default async function wishlistRoutes(app, options) {
            w.shareId,
            w.title,
            w.createdAt,
+           w.updatedAt,
            json_object(
              'id', u.id,
              'firstName', u.firstName,
@@ -122,12 +124,14 @@ export default async function wishlistRoutes(app, options) {
 
       if (!wishlist) {
         // User exists but has no wishlist, create one
+        const now = new Date().toISOString()
         const shareId = crypto.randomBytes(8).toString('hex')
         const result = await db.run(
-          'INSERT INTO wishlists (title, createdBy, createdAt, shareId) VALUES (?, ?, ?, ?)',
+          'INSERT INTO wishlists (title, createdBy, createdAt, updatedAt, shareId) VALUES (?, ?, ?, ?, ?)',
           'My Wishlist',
           authenticatedUserId,
-          new Date().toISOString(),
+          now,
+          now,
           shareId,
         )
 
@@ -149,7 +153,7 @@ export default async function wishlistRoutes(app, options) {
       // The rest of the logic remains the same as the shared route
       const items = await db.all(
         `SELECT
-           i.id, i.text, i.links, i.photos, i.createdAt, i.createdBy, i.reservedAt,
+           i.id, i.text, i.links, i.photos, i.createdAt, i.updatedAt, i.createdBy, i.reservedAt,
            CASE WHEN i.reservedBy IS NOT NULL THEN json_object('id', u.id, 'firstName', u.firstName, 'lastName', u.lastName, 'username', u.username, 'photoUrl', u.photoUrl) ELSE NULL END as reservedBy
          FROM items i
          LEFT JOIN users u ON i.reservedBy = u.id
@@ -235,28 +239,32 @@ export default async function wishlistRoutes(app, options) {
         if (item.id && existingItemIds.has(item.id)) {
           // Update existing item
           await db.run(
-            'UPDATE items SET text = ?, links = ?, photos = ? WHERE id = ? AND wishlistId = ?',
+            'UPDATE items SET text = ?, links = ?, photos = ?, updatedAt = ? WHERE id = ? AND wishlistId = ?',
             item.text,
             links,
             photos,
+            new Date().toISOString(),
             item.id,
             wishlist.id,
           )
         }
         else if (!item.id) {
           // Create new item
+          const now = new Date().toISOString()
           await db.run(
-            'INSERT INTO items (text, links, photos, wishlistId, createdBy, createdAt) VALUES (?, ?, ?, ?, ?, ?)',
+            'INSERT INTO items (text, links, photos, wishlistId, createdBy, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
             item.text,
             links,
             photos,
             wishlist.id,
             authenticatedUserId,
-            new Date().toISOString(),
+            now,
+            now,
           )
         }
       }
 
+      await db.run('UPDATE wishlists SET updatedAt = ? WHERE id = ?', new Date().toISOString(), wishlist.id)
       await db.exec('COMMIT')
 
       const { shareId } = await db.get('SELECT shareId FROM wishlists WHERE id = ?', wishlist.id)
