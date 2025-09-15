@@ -1,0 +1,9 @@
+-- Up
+ALTER TABLE users ADD COLUMN createdAt TEXT;
+ALTER TABLE users ADD COLUMN updatedAt TEXT;
+UPDATE users SET createdAt = CURRENT_TIMESTAMP, updatedAt = CURRENT_TIMESTAMP;
+
+-- Down
+ALTER TABLE users DROP COLUMN createdAt;
+ALTER TABLE users DROP COLUMN updatedAt;
+

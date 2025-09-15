@@ -17,17 +17,19 @@ export default async function authRoutes(app, options) {
         return reply.code(401).send({ error: 'Invalid Telegram data' })
       }
 
+      const now = new Date().toISOString()
       // Upsert user into the database
       await db.run(
-        `INSERT INTO users (id, firstName, lastName, username, languageCode, isPremium, photoUrl)
-         VALUES (?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO users (id, firstName, lastName, username, languageCode, isPremium, photoUrl, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            firstName = excluded.firstName,
            lastName = excluded.lastName,
            username = excluded.username,
            languageCode = excluded.languageCode,
            isPremium = excluded.isPremium,
-           photoUrl = excluded.photoUrl`,
+           photoUrl = excluded.photoUrl,
+           updatedAt = excluded.updatedAt`,
         user.id,
         user.first_name,
         user.last_name,
@@ -35,17 +37,23 @@ export default async function authRoutes(app, options) {
         user.language_code,
         user.is_premium ? 1 : 0,
         user.photo_url,
+        now,
+        now,
       )
+
+      const dbUser = await db.get('SELECT * FROM users WHERE id = ?', user.id)
 
       const token = app.jwt.sign({ id: user.id })
       reply.send({
-        id: user.id,
-        firstName: user.first_name,
-        lastName: user.last_name,
-        username: user.username,
-        languageCode: user.language_code,
-        isPremium: user.is_premium,
-        photoUrl: user.photo_url,
+        id: dbUser.id,
+        firstName: dbUser.firstName,
+        lastName: dbUser.lastName,
+        username: dbUser.username,
+        languageCode: dbUser.languageCode,
+        isPremium: dbUser.isPremium,
+        photoUrl: dbUser.photoUrl,
+        createdAt: dbUser.createdAt,
+        updatedAt: dbUser.updatedAt,
         token,
       })
     }

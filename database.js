@@ -1,10 +1,19 @@
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { open } from 'sqlite'
 import sqlite3 from 'sqlite3'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 async function setupDatabase() {
   const db = await open({
     filename: './wishlist.db',
     driver: sqlite3.Database,
+  })
+
+  await db.migrate({
+    migrationsPath: path.join(__dirname, 'migrations'),
   })
 
   await db.exec(`
@@ -15,7 +24,9 @@ async function setupDatabase() {
       username TEXT,
       languageCode TEXT,
       isPremium INTEGER,
-      photoUrl TEXT
+      photoUrl TEXT,
+      createdAt TEXT,
+      updatedAt TEXT
     );
 
     CREATE TABLE IF NOT EXISTS wishlists (
