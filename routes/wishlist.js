@@ -261,7 +261,7 @@ export default async function wishlistRoutes(app, options) {
     }
   })
 
-  app.post('/items/:itemId/reserve', async (request, reply) => {
+  app.post('/items/reserve/:itemId', async (request, reply) => {
     try {
       const { itemId } = request.params
       const authenticatedUserId = request.user.id
@@ -289,6 +289,45 @@ export default async function wishlistRoutes(app, options) {
         'UPDATE items SET reservedBy = ?, reservedAt = ? WHERE id = ?',
         authenticatedUserId,
         new Date().toISOString(),
+        itemId,
+      )
+
+      const { shareId } = await db.get('SELECT w.shareId FROM wishlists w JOIN items i ON w.id = i.wishlistId WHERE i.id = ?', itemId)
+      await broadcast(shareId, app, db, authenticatedUserId)
+
+      reply.send({ success: true })
+    }
+    catch (error) {
+      app.log.error(error)
+      reply.code(500).send({ error: 'Internal Server Error' })
+    }
+  })
+
+  app.post('/items/reserve/cancel/:itemId', async (request, reply) => {
+    try {
+      const { itemId } = request.params
+      const authenticatedUserId = request.user.id
+
+      const item = await db.get('SELECT * FROM items WHERE id = ?', itemId)
+      if (!item) {
+        return reply.code(404).send({ error: 'Item not found.' })
+      }
+
+      const wishlist = await db.get('SELECT createdBy FROM wishlists WHERE id = ?', item.wishlistId)
+      if (wishlist.createdBy === authenticatedUserId) {
+        return reply.code(403).send({ error: 'You cannot manage reservations for your own wishlist.' })
+      }
+
+      if (!item.reservedBy) {
+        return reply.code(409).send({ error: 'This item is not currently reserved.' })
+      }
+
+      if (item.reservedBy !== authenticatedUserId) {
+        return reply.code(403).send({ error: 'You can only cancel your own reservation.' })
+      }
+
+      await db.run(
+        'UPDATE items SET reservedBy = NULL, reservedAt = NULL WHERE id = ?',
         itemId,
       )
 

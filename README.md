@@ -88,7 +88,7 @@ Synchronizes the items for the authenticated user's wishlist. This single endpoi
     ```
 -   **Side Effect**: Broadcasts an `items_updated` message to all WebSocket clients subscribed to this wishlist.
 
-#### `POST /wishlist/items/:itemId/reserve`
+#### `POST /wishlist/items/reserve/:itemId`
 
 Reserves an item on a wishlist.
 
@@ -103,7 +103,23 @@ Reserves an item on a wishlist.
     -   `403 Forbidden`: If a user tries to reserve an item on their own list.
     -   `404 Not Found`: If the item does not exist.
     -   `409 Conflict`: If the item is already reserved by another user.
--   **Side Effect**: Broadcasts an `item_reserved` message to all WebSocket clients subscribed to this wishlist.
+-   **Side Effect**: Broadcasts an update to all WebSocket clients subscribed to this wishlist.
+
+#### `POST /wishlist/items/reserve/cancel/:itemId`
+
+Cancels a reservation for an item on a wishlist.
+
+-   **Details**:
+    -   A user can only cancel their own reservation.
+-   **Success Response (200)**:
+    ```json
+    { "success": true }
+    ```
+-   **Error Responses**:
+    -   `403 Forbidden`: If a user tries to cancel a reservation that is not theirs.
+    -   `404 Not Found`: If the item does not exist.
+    -   `409 Conflict`: If the item is not currently reserved.
+-   **Side Effect**: Broadcasts an update to all WebSocket clients subscribed to this wishlist.
 
 ### WebSockets
 
