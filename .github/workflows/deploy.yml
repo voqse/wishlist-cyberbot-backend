@@ -32,4 +32,4 @@ jobs:
             cd /var/www/giftlist-api
             yarn install --immutable --immutable-cache
             pm2 delete index.js
-            pm2 start index.js --name 'giftlist-api' -i 2
+            pm2 start index.js --name 'giftlist-api'
