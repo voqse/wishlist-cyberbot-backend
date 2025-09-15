@@ -48,6 +48,7 @@ async function getWishlist(db, shareId, authenticatedUserId) {
       ...rest,
       links: item.links ? JSON.parse(item.links) : [],
       photos: item.photos ? JSON.parse(item.photos) : [],
+      reservedBy: null,
     }
 
     if (reservedBy && !isOwner) {
@@ -60,12 +61,12 @@ async function getWishlist(db, shareId, authenticatedUserId) {
   return wishlist
 }
 
-async function broadcast(shareId, app, db, authenticatedUserId) {
+async function broadcast(shareId, app, db, user) {
   const clients = connections.get(shareId)
   if (clients) {
     app.log.info(`Broadcasting to ${clients.size} clients for wishlist ${shareId}`)
-    const wishlist = await getWishlist(db, shareId, authenticatedUserId)
     for (const client of clients) {
+      const wishlist = await getWishlist(db, shareId, user.id)
       client.send(JSON.stringify(wishlist))
     }
   }
@@ -255,7 +256,7 @@ export default async function wishlistRoutes(app, options) {
       await db.exec('COMMIT')
 
       const { shareId } = await db.get('SELECT shareId FROM wishlists WHERE id = ?', wishlist.id)
-      await broadcast(shareId, app, db, authenticatedUserId)
+      await broadcast(shareId, app, db, request.user)
 
       reply.send({ success: true })
     }
@@ -298,7 +299,7 @@ export default async function wishlistRoutes(app, options) {
       )
 
       const { shareId } = await db.get('SELECT w.shareId FROM wishlists w JOIN items i ON w.id = i.wishlistId WHERE i.id = ?', itemId)
-      await broadcast(shareId, app, db, authenticatedUserId)
+      await broadcast(shareId, app, db, request.user)
 
       reply.send({ success: true })
     }
@@ -337,7 +338,7 @@ export default async function wishlistRoutes(app, options) {
       )
 
       const { shareId } = await db.get('SELECT w.shareId FROM wishlists w JOIN items i ON w.id = i.wishlistId WHERE i.id = ?', itemId)
-      await broadcast(shareId, app, db, authenticatedUserId)
+      await broadcast(shareId, app, db, request.user)
 
       reply.send({ success: true })
     }
