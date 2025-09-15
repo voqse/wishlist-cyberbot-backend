@@ -194,11 +194,14 @@ export default async function wishlistRoutes(app, options) {
   app.post('/items', async (request, reply) => {
     try {
       const authenticatedUserId = request.user.id
-      const { items: incomingItems } = request.body
+      let { items: incomingItems } = request.body
 
       if (!Array.isArray(incomingItems)) {
         return reply.code(400).send({ error: 'Items must be an array.' })
       }
+
+      // Filter out empty items before processing
+      incomingItems = incomingItems.filter(item => item.text || (item.links && item.links.length > 0) || (item.photos && item.photos.length > 0))
 
       const wishlist = await db.get('SELECT id FROM wishlists WHERE createdBy = ?', authenticatedUserId)
       if (!wishlist) {
