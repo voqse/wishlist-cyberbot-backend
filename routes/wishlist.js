@@ -204,7 +204,11 @@ export default async function wishlistRoutes(app, options) {
       }
 
       // Filter out empty items before processing
-      incomingItems = incomingItems.filter(item => item.text || (item.links && item.links.length > 0) || (item.photos && item.photos.length > 0))
+      incomingItems = incomingItems.filter(
+        item => item.text
+          || (item.links && item.links.length > 0)
+          || (item.photos && item.photos.length > 0),
+      )
 
       const wishlist = await db.get('SELECT id FROM wishlists WHERE createdBy = ?', authenticatedUserId)
       if (!wishlist) {
@@ -213,17 +217,23 @@ export default async function wishlistRoutes(app, options) {
 
       const existingItems = await db.all('SELECT id FROM items WHERE wishlistId = ?', wishlist.id)
       const existingItemIds = new Set(existingItems.map(i => i.id))
-      const incomingItemIds = new Set(incomingItems.filter(i => i.id).map(i => i.id))
+      const incomingItemIds = new Set(incomingItems.map(i => i.id).filter(Boolean))
 
       await db.exec('BEGIN')
 
-      // Add or update items
+      // Delete items that are not in the incoming list
+      const idsToDelete = [...existingItemIds].filter(id => !incomingItemIds.has(id))
+      if (idsToDelete.length > 0) {
+        const placeholders = idsToDelete.map(() => '?').join(',')
+        await db.run(`DELETE FROM items WHERE id IN (${placeholders}) AND wishlistId = ?`, ...idsToDelete, wishlist.id)
+      }
+
       for (const item of incomingItems) {
         const links = JSON.stringify(item.links || [])
         const photos = JSON.stringify(item.photos || [])
 
-        if (item.id) { // Update existing item
-          if (!existingItemIds.has(item.id)) continue // Don't update items that don't belong to the user
+        if (item.id && existingItemIds.has(item.id)) {
+          // Update existing item
           await db.run(
             'UPDATE items SET text = ?, links = ?, photos = ? WHERE id = ? AND wishlistId = ?',
             item.text,
@@ -233,23 +243,17 @@ export default async function wishlistRoutes(app, options) {
             wishlist.id,
           )
         }
-        else { // Add new item
+        else if (!item.id) {
+          // Create new item
           await db.run(
-            'INSERT INTO items (text, links, photos, createdBy, createdAt, wishlistId) VALUES (?, ?, ?, ?, ?, ?)',
+            'INSERT INTO items (text, links, photos, wishlistId, createdBy, createdAt) VALUES (?, ?, ?, ?, ?, ?)',
             item.text,
             links,
             photos,
+            wishlist.id,
             authenticatedUserId,
             new Date().toISOString(),
-            wishlist.id,
           )
-        }
-      }
-
-      // Delete items that are no longer in the list
-      for (const id of existingItemIds) {
-        if (!incomingItemIds.has(id)) {
-          await db.run('DELETE FROM items WHERE id = ?', id)
         }
       }
 
