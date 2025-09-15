@@ -2,12 +2,71 @@ import crypto from 'node:crypto'
 
 const connections = new Map()
 
-function broadcast(shareId, message, app) {
+async function getWishlist(db, shareId, authenticatedUserId) {
+  // Get wishlist and creator by shareId
+  const wishlist = await db.get(
+    `SELECT
+       w.id,
+       w.shareId,
+       w.title,
+       w.createdAt,
+       json_object(
+         'id', u.id,
+         'firstName', u.firstName,
+         'lastName', u.lastName,
+         'username', u.username,
+         'photoUrl', u.photoUrl
+       ) as createdBy
+     FROM wishlists w
+     JOIN users u ON w.createdBy = u.id
+     WHERE w.shareId = ?`,
+    shareId,
+  )
+
+  if (!wishlist) {
+    return null
+  }
+
+  wishlist.createdBy = JSON.parse(wishlist.createdBy)
+
+  // Get items for the wishlist
+  const items = await db.all(
+    `SELECT
+       i.id, i.text, i.links, i.photos, i.createdAt, i.createdBy, i.reservedAt,
+       CASE WHEN i.reservedBy IS NOT NULL THEN json_object('id', u.id, 'firstName', u.firstName, 'lastName', u.lastName, 'username', u.username, 'photoUrl', u.photoUrl) ELSE NULL END as reservedBy
+     FROM items i
+     LEFT JOIN users u ON i.reservedBy = u.id
+     WHERE i.wishlistId = ?`,
+    wishlist.id,
+  )
+
+  const isOwner = authenticatedUserId === wishlist.createdBy.id
+
+  wishlist.items = items.map((item) => {
+    const { reservedBy, ...rest } = item
+    const result = {
+      ...rest,
+      links: item.links ? JSON.parse(item.links) : [],
+      photos: item.photos ? JSON.parse(item.photos) : [],
+    }
+
+    if (reservedBy && !isOwner) {
+      result.reservedBy = JSON.parse(reservedBy)
+    }
+
+    return result
+  })
+
+  return wishlist
+}
+
+async function broadcast(shareId, app, db, authenticatedUserId) {
   const clients = connections.get(shareId)
   if (clients) {
     app.log.info(`Broadcasting to ${clients.size} clients for wishlist ${shareId}`)
+    const wishlist = await getWishlist(db, shareId, authenticatedUserId)
     for (const client of clients) {
-      client.send(JSON.stringify(message))
+      client.send(JSON.stringify({ type: 'update', wishlist }))
     }
   }
 }
@@ -97,13 +156,12 @@ export default async function wishlistRoutes(app, options) {
 
       wishlist.items = items.map((item) => {
         const { reservedBy, ...rest } = item
-        const result = {
+        return {
           ...rest,
           links: item.links ? JSON.parse(item.links) : [],
           photos: item.photos ? JSON.parse(item.photos) : [],
-          isReserved: !!reservedBy,
+          reservedBy: reservedBy ? JSON.parse(reservedBy) : null,
         }
-        return result
       })
 
       reply.send(wishlist)
@@ -119,66 +177,11 @@ export default async function wishlistRoutes(app, options) {
       const { shareId } = request.params
       const authenticatedUserId = request.user.id
 
-      // Get wishlist and creator by shareId
-      const wishlist = await db.get(
-        `SELECT
-           w.id,
-           w.shareId,
-           w.title,
-           w.createdAt,
-           json_object(
-             'id', u.id,
-             'firstName', u.firstName,
-             'lastName', u.lastName,
-             'username', u.username,
-             'photoUrl', u.photoUrl
-           ) as createdBy
-         FROM wishlists w
-         JOIN users u ON w.createdBy = u.id
-         WHERE w.shareId = ?`,
-        shareId,
-      )
+      const wishlist = await getWishlist(db, shareId, authenticatedUserId)
 
       if (!wishlist) {
         return reply.code(404).send({ error: 'Wishlist not found' })
       }
-
-      wishlist.createdBy = JSON.parse(wishlist.createdBy)
-
-      // Get items for the wishlist
-      const items = await db.all(
-        `SELECT
-           i.id, i.text, i.links, i.photos, i.createdAt, i.createdBy, i.reservedAt,
-           CASE WHEN i.reservedBy IS NOT NULL THEN json_object('id', u.id, 'firstName', u.firstName, 'lastName', u.lastName, 'username', u.username, 'photoUrl', u.photoUrl) ELSE NULL END as reservedBy
-         FROM items i
-         LEFT JOIN users u ON i.reservedBy = u.id
-         WHERE i.wishlistId = ?`,
-        wishlist.id,
-      )
-
-      const isOwner = authenticatedUserId === wishlist.createdBy.id
-
-      wishlist.items = items.map((item) => {
-        const { reservedBy, ...rest } = item
-        const result = {
-          ...rest,
-          links: item.links ? JSON.parse(item.links) : [],
-          photos: item.photos ? JSON.parse(item.photos) : [],
-        }
-
-        if (reservedBy) {
-          const reservedByUser = JSON.parse(reservedBy)
-          if (!isOwner) {
-            result.reservedBy = reservedByUser
-          }
-          result.isReserved = true
-        }
-        else {
-          result.isReserved = false
-        }
-
-        return result
-      })
 
       reply.send(wishlist)
     }
@@ -247,7 +250,7 @@ export default async function wishlistRoutes(app, options) {
       await db.exec('COMMIT')
 
       const { shareId } = await db.get('SELECT shareId FROM wishlists WHERE id = ?', wishlist.id)
-      broadcast(shareId, { type: 'items_updated' }, app)
+      await broadcast(shareId, app, db, authenticatedUserId)
 
       reply.send({ success: true })
     }
@@ -290,7 +293,7 @@ export default async function wishlistRoutes(app, options) {
       )
 
       const { shareId } = await db.get('SELECT w.shareId FROM wishlists w JOIN items i ON w.id = i.wishlistId WHERE i.id = ?', itemId)
-      broadcast(shareId, { type: 'item_reserved', itemId: Number.parseInt(itemId, 10) }, app)
+      await broadcast(shareId, app, db, authenticatedUserId)
 
       reply.send({ success: true })
     }
