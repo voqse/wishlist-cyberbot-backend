@@ -24,9 +24,7 @@ async function getWishlist(db, shareId, authenticatedUserId) {
     shareId,
   )
 
-  if (!wishlist) {
-    return null
-  }
+  if (!wishlist) return null
 
   wishlist.createdBy = JSON.parse(wishlist.createdBy)
 
@@ -41,19 +39,21 @@ async function getWishlist(db, shareId, authenticatedUserId) {
     wishlist.id,
   )
 
-  const isOwner = authenticatedUserId === wishlist.createdBy.id
+  const hideReservations = authenticatedUserId && authenticatedUserId === wishlist.createdBy.id
 
   wishlist.items = items.map((item) => {
-    const { reservedBy, ...rest } = item
+    const { reservedBy, reservedAt, ...rest } = item
     const result = {
       ...rest,
       links: item.links ? JSON.parse(item.links) : [],
       photos: item.photos ? JSON.parse(item.photos) : [],
       reservedBy: null,
+      reservedAt: null,
     }
 
-    if (reservedBy && !isOwner) {
+    if (reservedBy && !hideReservations) {
       result.reservedBy = JSON.parse(reservedBy)
+      result.reservedAt = reservedAt
     }
 
     return result
@@ -62,12 +62,12 @@ async function getWishlist(db, shareId, authenticatedUserId) {
   return wishlist
 }
 
-async function broadcast(shareId, app, db, user) {
+async function broadcast(shareId, app, db) {
   const clients = connections.get(shareId)
   if (clients) {
     app.log.info(`Broadcasting to ${clients.size} clients for wishlist ${shareId}`)
     for (const client of clients) {
-      const wishlist = await getWishlist(db, shareId, user.id)
+      const wishlist = await getWishlist(db, shareId)
       client.send(JSON.stringify(wishlist))
     }
   }
@@ -201,18 +201,11 @@ export default async function wishlistRoutes(app, options) {
   app.post('/items', async (request, reply) => {
     try {
       const authenticatedUserId = request.user.id
-      let { items: incomingItems } = request.body
+      const { items: incomingItems } = request.body
 
       if (!Array.isArray(incomingItems)) {
         return reply.code(400).send({ error: 'Items must be an array.' })
       }
-
-      // Filter out empty items before processing
-      incomingItems = incomingItems.filter(
-        item => item.text
-          || (item.links && item.links.length > 0)
-          || (item.photos && item.photos.length > 0),
-      )
 
       const wishlist = await db.get('SELECT id FROM wishlists WHERE createdBy = ?', authenticatedUserId)
       if (!wishlist) {
@@ -268,7 +261,7 @@ export default async function wishlistRoutes(app, options) {
       await db.exec('COMMIT')
 
       const { shareId } = await db.get('SELECT shareId FROM wishlists WHERE id = ?', wishlist.id)
-      await broadcast(shareId, app, db, request.user)
+      await broadcast(shareId, app, db)
 
       reply.send({ success: true })
     }
@@ -311,7 +304,7 @@ export default async function wishlistRoutes(app, options) {
       )
 
       const { shareId } = await db.get('SELECT w.shareId FROM wishlists w JOIN items i ON w.id = i.wishlistId WHERE i.id = ?', itemId)
-      await broadcast(shareId, app, db, request.user)
+      await broadcast(shareId, app, db)
 
       reply.send({ success: true })
     }
@@ -350,7 +343,7 @@ export default async function wishlistRoutes(app, options) {
       )
 
       const { shareId } = await db.get('SELECT w.shareId FROM wishlists w JOIN items i ON w.id = i.wishlistId WHERE i.id = ?', itemId)
-      await broadcast(shareId, app, db, request.user)
+      await broadcast(shareId, app, db)
 
       reply.send({ success: true })
     }
