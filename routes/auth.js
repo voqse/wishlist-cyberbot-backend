@@ -50,10 +50,11 @@ export default async function authRoutes(app, options) {
         lastName: dbUser.lastName,
         username: dbUser.username,
         languageCode: dbUser.languageCode,
-        isPremium: dbUser.isPremium,
+        isPremium: !!dbUser.isPremium,
         photoUrl: dbUser.photoUrl,
         createdAt: dbUser.createdAt,
         updatedAt: dbUser.updatedAt,
+        isAdmin: !!dbUser.isAdmin,
         token,
       })
     }
