@@ -14,11 +14,7 @@ export default async function initBot(db) {
 
   bot.command('users', async (ctx) => {
     const user = await db.get('SELECT * FROM users WHERE id = ?', ctx.from.id)
-
-    if (!user || !user.isAdmin) {
-      // return ctx.reply('You are not authorized to use this command.')
-      return
-    }
+    if (!user || !user.isAdmin) return
 
     const totalUsers = await db.get('SELECT COUNT(*) as count FROM users')
 
@@ -46,5 +42,6 @@ Active (weekly): ${weeklyActive.count}`
   })
 
   bot.launch()
-  console.log('Telegram bot started with telegraf...')
+    .then(() => console.log('Telegram bot started...'))
+    .catch(() => console.warn('Failed to launch Telegram bot.'))
 }
