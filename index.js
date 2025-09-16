@@ -1,11 +1,11 @@
 import jwt from '@fastify/jwt'
 import websocket from '@fastify/websocket'
 import fastify from 'fastify'
+import initBot from './bot.js'
 import setupDatabase from './database.js'
 import apiRoutes from './routes/index.js'
 
 const app = fastify({ logger: true })
-let db
 
 app.register(jwt, {
   secret: process.env.JWT_SECRET,
@@ -35,7 +35,8 @@ app.addHook('onRequest', async (request, reply) => {
 
 async function start() {
   try {
-    db = await setupDatabase()
+    const db = await setupDatabase()
+    await initBot(db)
     app.register(apiRoutes, { prefix: process.env.API_PREFIX || '', db })
     await app.listen({ port: 3000 })
   }

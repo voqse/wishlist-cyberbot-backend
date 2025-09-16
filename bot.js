@@ -1,0 +1,50 @@
+import dotenv from 'dotenv'
+import { Telegraf } from 'telegraf'
+
+dotenv.config({ path: ['.env.local', '.env'] })
+
+const token = process.env.TELEGRAM_BOT_TOKEN
+
+if (!token) {
+  throw new Error('TELEGRAM_BOT_TOKEN not found in .env.local')
+}
+
+export default async function initBot(db) {
+  const bot = new Telegraf(token)
+
+  bot.command('users', async (ctx) => {
+    const user = await db.get('SELECT * FROM users WHERE id = ?', ctx.from.id)
+
+    if (!user || !user.isAdmin) {
+      // return ctx.reply('You are not authorized to use this command.')
+      return
+    }
+
+    const totalUsers = await db.get('SELECT COUNT(*) as count FROM users')
+
+    const oneMonthAgo = new Date()
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
+
+    const monthlyActive = await db.get(
+      'SELECT COUNT(*) as count FROM users WHERE updated_at > ?',
+      oneMonthAgo.toISOString(),
+    )
+
+    const oneWeekAgo = new Date()
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
+
+    const weeklyActive = await db.get(
+      'SELECT COUNT(*) as count FROM users WHERE updated_at > ?',
+      oneWeekAgo.toISOString(),
+    )
+
+    const message = `Total: ${totalUsers.count}
+Active (monthly): ${monthlyActive.count}
+Active (weekly): ${weeklyActive.count}`
+
+    ctx.reply(message)
+  })
+
+  bot.launch()
+  console.log('Telegram bot started with telegraf...')
+}
