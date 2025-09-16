@@ -26,7 +26,7 @@ export default async function initBot(db) {
     oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
 
     const monthlyActive = await db.get(
-      'SELECT COUNT(*) as count FROM users WHERE updated_at > ?',
+      'SELECT COUNT(*) as count FROM users WHERE updatedAt > ?',
       oneMonthAgo.toISOString(),
     )
 
@@ -34,7 +34,7 @@ export default async function initBot(db) {
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
 
     const weeklyActive = await db.get(
-      'SELECT COUNT(*) as count FROM users WHERE updated_at > ?',
+      'SELECT COUNT(*) as count FROM users WHERE updatedAt > ?',
       oneWeekAgo.toISOString(),
     )
 
