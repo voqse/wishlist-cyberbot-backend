@@ -8,18 +8,18 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: 'Checkout Repository'
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: 'Copy Production files to Remote'
+      - name: Copy Production files to Remote
         uses: appleboy/scp-action@v1.0.0
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USERNAME }}
           port: ${{ secrets.DEPLOY_PORT }}
           key: ${{ secrets.DEPLOY_SSHKEY }}
-          source: '.'
-          target: '/var/www/giftlist-api'
+          source: .
+          target: /var/www/giftlist-api
 
       - name: Executing remote ssh commands
         uses: appleboy/ssh-action@master
