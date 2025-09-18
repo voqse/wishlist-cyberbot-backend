@@ -82,11 +82,10 @@ export default async function wishlistRoutes(app, options) {
     if (!connections.has(shareId)) {
       connections.set(shareId, new Set())
     }
+
     const clients = connections.get(shareId)
     clients.add(socket)
     app.log.info(`New client connected for wishlist ${shareId}. Total clients: ${clients.size}`)
-
-    socket.on('message', () => socket.send('pong'))
 
     socket.on('close', () => {
       clients.delete(socket)

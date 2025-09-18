@@ -13,23 +13,43 @@ app.register(jwt, {
 
 app.register(websocket)
 
+app.server.on('upgrade', async (request, socket, head) => {
+  const header = request.headers['sec-websocket-protocol']
+  if (!header)
+    return socket.destroy()
+
+  const [protocol, token] = header.split(', ')
+  if (protocol !== 'bearer')
+    return socket.destroy()
+
+  try {
+    await app.jwt.verify(token)
+  }
+  catch {
+    return socket.destroy()
+  }
+})
+
 app.addHook('onRequest', async (request, reply) => {
   const url = request.raw.url
   const apiPrefix = process.env.API_PREFIX || ''
 
-  // Exclude auth routes and WebSocket connections from JWT verification
-  if (url.startsWith(`${apiPrefix}/auth`) || url.startsWith(`${apiPrefix}/wishlist/ws`)) {
-    return
-  }
+  const routesWithoutAuth = [
+    `/auth`,
+    `/wishlist/ws`,
+  ]
 
-  // Only apply JWT verification for routes under the API prefix
-  if (url.startsWith(apiPrefix)) {
-    try {
-      await request.jwtVerify()
-    }
-    catch (err) {
-      reply.send(err)
-    }
+  const skipAuth = routesWithoutAuth
+    .map(route => url.startsWith(apiPrefix + route))
+    .includes(true)
+
+  if (skipAuth) return
+
+  try {
+    await request.jwtVerify()
+  }
+  catch {
+    reply.code(401).send({ error: 'Unauthorized' })
   }
 })
 
