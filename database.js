@@ -12,10 +12,7 @@ async function setupDatabase() {
     driver: sqlite3.Database,
   })
 
-  await db.migrate({
-    migrationsPath: path.join(__dirname, 'migrations'),
-  })
-
+  // Create initial tables (without columns that will be added by migrations)
   await db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY,
@@ -24,9 +21,7 @@ async function setupDatabase() {
       username TEXT,
       languageCode TEXT,
       isPremium INTEGER,
-      photoUrl TEXT,
-      createdAt TEXT,
-      updatedAt TEXT
+      photoUrl TEXT
     );
 
     CREATE TABLE IF NOT EXISTS wishlists (
@@ -35,7 +30,6 @@ async function setupDatabase() {
       title TEXT NOT NULL,
       createdBy INTEGER NOT NULL UNIQUE,
       createdAt TEXT,
-      updatedAt TEXT,
       FOREIGN KEY (createdBy) REFERENCES users(id)
     );
 
@@ -46,7 +40,6 @@ async function setupDatabase() {
       photos TEXT,
       createdBy INTEGER NOT NULL,
       createdAt TEXT,
-      updatedAt TEXT,
       reservedBy INTEGER,
       reservedAt TEXT,
       wishlistId INTEGER NOT NULL,
@@ -55,6 +48,11 @@ async function setupDatabase() {
       FOREIGN KEY (wishlistId) REFERENCES wishlists(id)
     );
   `)
+
+  // Run migrations to add additional columns
+  await db.migrate({
+    migrationsPath: path.join(__dirname, 'migrations'),
+  })
 
   console.log('Database setup complete.')
   return db
