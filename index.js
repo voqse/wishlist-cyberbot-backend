@@ -13,7 +13,7 @@ app.register(jwt, {
 
 app.register(websocket)
 
-app.server.on('upgrade', async (request, socket, head) => {
+app.server.on('upgrade', async (request, socket, _head) => {
   const header = request.headers['sec-websocket-protocol']
   if (!header)
     return socket.destroy()
