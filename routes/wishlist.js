@@ -263,7 +263,8 @@ export default async function wishlistRoutes(app, options) {
       const { shareId } = await db.get('SELECT shareId FROM wishlists WHERE id = ?', wishlist.id)
       await broadcast(shareId, app, db)
 
-      reply.send({ success: true })
+      const updatedWishlist = await getWishlist(db, shareId, authenticatedUserId)
+      reply.send(updatedWishlist)
     }
     catch (error) {
       await db.exec('ROLLBACK')
